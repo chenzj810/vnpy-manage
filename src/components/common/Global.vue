@@ -1,6 +1,6 @@
 <script>
     var uniUrl = 'https://wifi.kunteng.org';
-    var baseUrl = 'http://127.0.0.1:8080';
+    var baseUrl = 'http://127.0.0.1:9000';
     //时间转换
     function timeStamp( second_time ){
         var time = parseInt(second_time) + "秒";

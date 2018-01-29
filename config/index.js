@@ -23,21 +23,17 @@ module.exports = {
     },
     dev: {
         env: require('./dev.env'),
-        port: 9000,
+        port: 80,
         autoOpenBrowser: true,
         assetsSubDirectory: 'static',
         assetsPublicPath: '/',
         proxyTable: {
             '/api':{
-                target:'http://127.0.0.1:8090',
+                target:'http://127.0.0.1:9000',
                 changeOrigin:true,
                 pathRewrite:{
-                    '/api':''
+                    '^/api':''
                 }
-            },
-            '/ms':{
-                target: 'https://www.easy-mock.com/mock/592501a391470c0ac1fab128',
-                changeOrigin: true
             }
         },
         // CSS Sourcemaps off by default because relative paths are "buggy"
@@ -45,6 +41,6 @@ module.exports = {
         // (https://github.com/webpack/css-loader#sourcemaps)
         // In our experience, they generally work as expected,
         // just be aware of this issue when enabling this option.
-        cssSourceMap: false
+       // cssSourceMap: false
     }
 }

@@ -77,7 +77,7 @@
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">
-                <el-button @click="dialogFormVisible = false">取 消</el-button>
+                <el-button @click="dialogFormVisible = false">退 出</el-button>
                 <el-button type="primary" @click="saveAdd('form')"v-loading.fullscreen.lock="fullscreenLoading">添 加</el-button>
             </div>
         </el-dialog>
@@ -124,18 +124,17 @@
         },
         created: function(){
             this.getTaskList();
-            /*
             this.getStrategyList();
             this.getRiskCtrlList();
             this.getGatewayList();
-            */
+
             //this.getValidStockList();
         },
         methods: {
             getTaskList: function(){//获取task列表
                 var self = this;
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/task/list').then(function(res){
+                self.$axios.post('/api/task/list').then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.pageTotal = res.data.extra.length;
@@ -149,7 +148,7 @@
             getStrategyList: function(){//获取rom列表
                 var self = this;
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/strategy/list').then(function(res){
+                self.$axios.post('/api/strategy/list').then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.strategy_list = res.data.extra;
@@ -159,7 +158,7 @@
             getRiskCtrlList: function(){//获取设备类型
                 var self = this;
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/riskctrl/list').then(function(res){
+                self.$axios.post('/api/riskctrl/list').then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.riskctrl_list = res.data.extra;
@@ -169,7 +168,7 @@
             getGatewayList: function(){//获取设备类型
                 var self = this;
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/gateway/list').then(function(res){
+                self.$axios.post('/api/gateway/list').then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.gateway_list = res.data.extra;
@@ -179,7 +178,7 @@
             getValidStockList: function(){//获取设备类型
                 var self = this;
                 self.loading = false;
-                self.$axios.post(global_.baseUrl+'/stock/list').then(function(res){
+                self.$axios.post('/api/stock/list').then(function(res){
                     //self.loading = false;
                     if(res.data.ret_code == 0){
                         self.valid_stock_list = res.data.extra;
@@ -195,7 +194,7 @@
 
                 var params = {stock_code:self.form.stock_code}
                 self.loading = false;
-                self.$axios.post(global_.baseUrl+'/stock/name', qs.stringify(params)).then(function(res){
+                self.$axios.post('/api/stock/name', qs.stringify(params)).then(function(res){
                     //self.loading = false;
                     if(res.data.ret_code == 0){
                         self.form.stock_name = res.data.extra;
@@ -232,7 +231,7 @@
                 };
 
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/task/add',qs.stringify(params), {headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(function(res){
+                self.$axios.post('/api/task/add',qs.stringify(params), {headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(function(res){
                     self.loading = false;
                     console.log(res);
                     if(res.data.ret_code == 0){
@@ -258,7 +257,7 @@
                     file_name:fileName
                 };
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/rom/download',params).then(function(res){
+                self.$axios.post('/api/rom/download',params).then(function(res){
                     self.loading = false;
                     console.log(res);
                     var blob = new Blob([res.data]);
@@ -291,7 +290,7 @@
                     task_id:task_id
                 };
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/task/del',qs.stringify(params)).then(function(res){
+                self.$axios.post('/api/task/del',qs.stringify(params)).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('删除成功');
@@ -311,7 +310,7 @@
                     file_name:fileName
                 };
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/rom/release',params).then(function(res){
+                self.$axios.post('/api/rom/release',params).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('操作成功');
@@ -331,7 +330,7 @@
                     file_name:fileName
                 };
                 self.loading = true;
-                self.$axios.post(global_.baseUrl+'/rom/revoke',params).then(function(res){
+                self.$axios.post('/api/rom/revoke',params).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('操作成功');
