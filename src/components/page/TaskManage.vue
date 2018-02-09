@@ -1,3 +1,4 @@
+<script src="../../../../node-elm-master/controller-http/task/task.js"></script>
 <template>
     <div class="table">
         <div class="crumbs">
@@ -10,19 +11,22 @@
             <el-button type="primary" icon="plus" class="handle-del mr10" @click="dialogFormVisible=true">创建任务</el-button>
         </div>
         <el-table :data="task_list" border style="width: 100%" ref="multipleTable" v-loading="loading">
-            <el-table-column prop="task_id" label="任务ID" width="80"></el-table-column>
-            <el-table-column prop="stock_code" label="股票代码" width="120"></el-table-column>
-            <el-table-column prop="stock_name" label="股票名称" width="120"></el-table-column>
-            <el-table-column prop="obj_amount" label="交易数量" width="120"></el-table-column>
+            <el-table-column type="index" label="ID" width="60"></el-table-column>
+            <el-table-column prop="stock_code" label="股票代码" width="100"></el-table-column>
+            <el-table-column prop="stock_name" label="股票名称" width="100"></el-table-column>
+            <el-table-column prop="obj_amount" label="操作量" width="80"></el-table-column>
             <el-table-column prop="strategy_name" label="策略名称" width="170"></el-table-column>
             <el-table-column prop="riskctrl_name" label="风控名称" width="170"></el-table-column>
-            <el-table-column prop="gateway_name" label="交易接口" width="170"></el-table-column>
+            <el-table-column prop="gateway_name" W="交易接口" width="170"></el-table-column>
+            <el-table-column prop="price" label="最新" width="80"></el-table-column>
+            <el-table-column prop="volume" label="成交量" width="80"></el-table-column>
 
             <el-table-column label="操作">
                 <template slot-scope="scope">
-                    <el-button class="btn1" type="text" size="small" @click="delTask(scope.row._id,scope.row.task_id)">删除</el-button>
-                    <el-button class="btn1" type="danger" size="small" v-if="scope.row.rom_status =='normal'" @click="revokeRom(scope.row._id,scope.row.file_name)">停止</el-button>
-                    <el-button class="btn1" type="success" size="small" v-else @click="releaseRom(scope.row._id,scope.row.file_name)">启动</el-button>
+                    <el-button class="btn1" type="text" size="small" @click="delTask(scope.row.task_id,scope.row.gateway_name)">删除</el-button>
+                    <el-button class="btn1" type="danger" size="small" v-if="scope.row.task_status =='running'" @click="stopTask(scope.row.task_id,scope.row.gateway_name)">停止</el-button>
+                    <el-button class="btn1" type="success" size="small" v-else @click="startTask(scope.row.task_id,scope.row.gateway_name)">启动</el-button>
+                    <el-button class="btn1" type="text" size="small" @click="dialogLogVisible=true">日志</el-button>
                 </template>
             </el-table-column>
         </el-table>
@@ -49,9 +53,9 @@
                     <el-select v-model="form.strategy_name" placeholder="请选择对应策略">
                         <el-option
                             v-for="item in strategy_list"
-                            :key="item"
-                            :label="item"
-                            :value="item">
+                                :key="item['appName']"
+                            :label="item['appDisplayName']"
+                            :value="item['appDisplayName']">
                         </el-option>
                     </el-select>
                 </el-form-item>
@@ -59,9 +63,9 @@
                     <el-select v-model="form.riskctrl_name" placeholder="请选择对应风控">
                         <el-option
                             v-for="item in riskctrl_list"
-                            :key="item"
-                            :label="item"
-                            :value="item">
+                            :key="item['appName']"
+                            :label="item['appDisplayName']"
+                            :value="item['appDisplayName']">
                         </el-option>
                     </el-select>
                 </el-form-item>
@@ -69,9 +73,9 @@
                     <el-select v-model="form.gateway_name" placeholder="请选择对应交易接口">
                         <el-option
                             v-for="item in gateway_list"
-                            :key="item"
-                            :label="item"
-                            :value="item">
+                            :key="item['gatewayName']"
+                            :label="item['gatewayDisplayName']"
+                            :value="item['gatewayDisplayName']">
                         </el-option>
                     </el-select>
                 </el-form-item>
@@ -81,13 +85,27 @@
                 <el-button type="primary" @click="saveAdd('form')"v-loading.fullscreen.lock="fullscreenLoading">添 加</el-button>
             </div>
         </el-dialog>
+        <el-dialog title="日志" :visible.sync="dialogLogVisible" class="digcont">
+            <el-form :model="form" :rules="rules" ref="form">
+                <el-form-item prop="route_mac">
+                    <el-input
+                        type="textarea"
+                        :rows="20"
+                        placeholder=""
+                        v-model="log.message">
+                    </el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogLogVisible = false">退 出</el-button>
+            </div>
+        </el-dialog>
 
     </div>
 </template>
 
 <script>
     import global_ from 'components/common/Global';
-    var qs = require('qs');
     export default {
         data: function(){
             return {
@@ -98,16 +116,23 @@
                 },
 
                 dialogFormVisible:false,
+                dialogLogVisible:false,
                 radio3:'全部',
+
+                tiemout:'',
 
                 form: {
                     task_id:'',
+                    task_status:'',
                     obj_amount:'',
                     stock_code:'',
                     stock_name:'',
                     strategy_name:'',
                     riskctrl_name: '',
                     gateway_name: ''
+                },
+                log:{
+                    message:''
                 },
 
                 formLabelWidth: '120px',
@@ -123,12 +148,26 @@
             }
         },
         created: function(){
+            if ( this.tiemout ) {
+                clearTimeout(this.tiemout);
+                this.tiemout = '';
+            }
+
             this.getTaskList();
+            this.getTaskPrice();
             this.getStrategyList();
             this.getRiskCtrlList();
             this.getGatewayList();
 
             //this.getValidStockList();
+        },
+        beforeDestroy: function(){
+            if ( this.tiemout ) {
+                clearTimeout(this.tiemout);
+                this.tiemout = '';
+            }
+
+            console.log('destory');
         },
         methods: {
             getTaskList: function(){//获取task列表
@@ -145,6 +184,54 @@
                     }
                 })
             },
+            getTaskPrice: function(){//获取task列表
+                var self = this;
+                var stock_list = []
+                for (var i = 0; i < self.task_list.length; i++) {
+                    if (self.task_list[i].task_status == 'running'){
+                        stock_list.push({task_id:self.task_list[i].task_id, stock_code:self.task_list[i].stock_code})
+                    }
+                }
+
+                self.loading = false;
+                self.$axios.post('/api/stock/price', stock_list).then(function(res){
+                    if(res.data.ret_code == 0){
+                        //self.task_list = res.data.extra.slice(0,10);
+                        for (var i = 0; i < res.data.extra.length; i++) {
+                            var item = res.data.extra[i];
+                            for (var j = 0; j < self.task_list.length; j++) {
+                                if (item['stock_code'] == self.task_list[j]['stock_code']){
+                                    self.task_list[j]['price'] = item['price']
+                                    self.task_list[j]['volume'] = item['volume']
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        console.log('resp:', res.data)
+                    }
+                })
+                console.log(this.$route.path )
+                if ( this.$route.path == '/task/manage' ) {
+                    this.tiemout = setTimeout(() => {
+                        //this.getTaskPrice();
+                    }, 5000);
+                }
+
+            },
+            updateTaskList: function(){//获取task列表
+                var self = this;
+                self.loading = true;
+                self.$axios.post('/api/task/update').then(function(res){
+                    self.loading = false;
+                    if(res.data.ret_code == 0){
+                        self.task_list = res.data.extra.slice(0,10);
+                    }
+                    else{
+                        self.task_list = []
+                    }
+                })
+            },
             getStrategyList: function(){//获取rom列表
                 var self = this;
                 self.loading = true;
@@ -152,6 +239,9 @@
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.strategy_list = res.data.extra;
+                    }
+                    else{
+                        console.log('resp:', res.data)
                     }
                 })
             },
@@ -163,6 +253,9 @@
                     if(res.data.ret_code == 0){
                         self.riskctrl_list = res.data.extra;
                     }
+                    else{
+                        console.log('resp:', res.data)
+                    }
                 })
             },
             getGatewayList: function(){//获取设备类型
@@ -172,6 +265,9 @@
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.gateway_list = res.data.extra;
+                    }
+                    else{
+                        console.log('resp:', res.data)
                     }
                 })
             },
@@ -194,10 +290,13 @@
 
                 var params = {stock_code:self.form.stock_code}
                 self.loading = false;
-                self.$axios.post('/api/stock/name', qs.stringify(params)).then(function(res){
+                self.$axios.post('/api/stock/name', params).then(function(res){
                     //self.loading = false;
                     if(res.data.ret_code == 0){
                         self.form.stock_name = res.data.extra;
+                    }
+                    else{
+                        console.log('resp:', res.data)
                     }
                 })
             },
@@ -211,7 +310,7 @@
                 this.fullscreenLoading  = false;
                 this.$message('创建成功');
                 this.dialogFormVisible = false;
-                this.getData();
+                this.getTaskList();
             },
             handleError: function(response,file,fileList){
                 this.$message('操作失败');
@@ -231,12 +330,12 @@
                 };
 
                 self.loading = true;
-                self.$axios.post('/api/task/add',qs.stringify(params), {headers: {'Content-Type': 'application/x-www-form-urlencoded'}}).then(function(res){
+                self.$axios.post('/api/task/add', params).then(function(res){
                     self.loading = false;
                     console.log(res);
                     if(res.data.ret_code == 0){
                         self.$message('添加成功');
-                        self.getData();
+                        self.getTaskList();
                     }
 
                 },function(err){
@@ -246,56 +345,22 @@
                 })
 
             },
-            downloadRom: function(id,fileName,status){//下载
-                var self = this;
-                if(status == 'revoke'){
-                    self.$message('固件已下架');
-                    return false;
-                }
-                var params = {
-                    _id: id,
-                    file_name:fileName
-                };
-                self.loading = true;
-                self.$axios.post('/api/rom/download',params).then(function(res){
-                    self.loading = false;
-                    console.log(res);
-                    var blob = new Blob([res.data]);
-                    var reader = new FileReader();
-                    reader.readAsDataURL(blob);  // 转换为base64，可以直接放入a表情href
-                    reader.onload = function (e) {
-                        // 转换完成，创建一个a标签用于下载
-                        var a = document.createElement('a');
-                        a.download = fileName;
-                        a.href = e.target.result;
-//                        $("body").append(a);  // 修复firefox中无法触发click
-                        a.click();
-//                        $(a).remove();
-                    }
-
-                    if(res.data.ret_code == 0){
-                        self.$message('删除成功');
-                        self.getData();
-                    }
-
-                },function(err){
-                    self.$message('删除失败');
-                    self.loading = false;
-                    console.log(err);
-                })
-            },
-            delTask: function(id,task_id){//删除
+            delTask: function(id,gateway_name){//删除
                 var self = this;
                 var params = {
-                    task_id:task_id
+                    task_id: id,
+                    gateway_name:gateway_name
                 };
                 self.loading = true;
-                self.$axios.post('/api/task/del',qs.stringify(params)).then(function(res){
+                self.$axios.post('/api/task/del', params).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('删除成功');
                         self.getTaskList();
                     }
+                    else {
+                        self.$message(res.data.extra);
+                    }
 
                 },function(err){
                     self.$message('删除失败');
@@ -303,18 +368,21 @@
                     console.log(err);
                 })
             },
-            releaseRom: function(id,fileName){//上架操作
+            startTask: function(id,gateway_name){//上架操作
                 var self = this;
                 var params = {
-                    _id: id,
-                    file_name:fileName
+                    task_id: id,
+                    gateway_name:gateway_name
                 };
                 self.loading = true;
-                self.$axios.post('/api/rom/release',params).then(function(res){
+                self.$axios.post('/api/task/start',params).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('操作成功');
-                        self.getData();
+                        self.getTaskList();
+                    }
+                    else {
+                        self.$message(res.data.extra);
                     }
 
                 },function(err){
@@ -323,18 +391,21 @@
                     console.log(err);
                 })
             },
-            revokeRom: function(id,fileName){//下架操作
+            stopTask: function(id,gateway_name){//下架操作
                 var self = this;
                 var params = {
-                    _id: id,
-                    file_name:fileName
+                    task_id: id,
+                    gateway_name:gateway_name
                 };
                 self.loading = true;
-                self.$axios.post('/api/rom/revoke',params).then(function(res){
+                self.$axios.post('/api/task/stop', params).then(function(res){
                     self.loading = false;
                     if(res.data.ret_code == 0){
                         self.$message('操作成功');
-                        self.getData();
+                        self.getTaskList();
+                    }
+                    else {
+                        self.$message(res.data.extra);
                     }
 
                 },function(err){
@@ -349,7 +420,7 @@
             },
             handleCurrentChange:function(val){
                 this.cur_page = val;
-                this.getData();
+                this.getTaskList();
             },
             filterTag:function(value, row) {
                 return row.tag === value;
